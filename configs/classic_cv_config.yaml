@@ -1,0 +1,12 @@
+preprocessing:
+  resize_width: 1280
+  blur_kernel_size: 5
+
+classification:
+  brightness_threshold: 200
+  min_mean_brightness: 160
+  min_max_brightness: 220
+  min_bright_pixel_ratio: 0.10
+
+debug:
+  save_debug_images: true

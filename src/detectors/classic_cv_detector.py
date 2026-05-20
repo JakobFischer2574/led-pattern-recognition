@@ -1,0 +1,47 @@
+from __future__ import annotations
+
+import time
+from pathlib import Path
+from typing import Any
+
+import numpy as np
+
+from src.classic_cv.feature_extraction import compute_brightness_features
+from src.classic_cv.led_state_classifier import classify_led_state
+from src.classic_cv.preprocessing import preprocess_frame
+from src.classic_cv.roi_extraction import extract_rois
+from src.classic_cv.segmentation import to_value_channel
+from src.detectors.base_detector import BaseDetector, DetectionResult
+from src.utils.image_debug import draw_led_debug_overlay, save_debug_image
+
+
+class ClassicCVDetector(BaseDetector):
+    def __init__(self, config: dict[str, Any], led_layout: dict[str, dict[str, int]]) -> None:
+        self.config = config
+        self.led_layout = led_layout
+
+    def detect(self, frame: np.ndarray) -> DetectionResult:
+        start = time.perf_counter()
+        prep_cfg = self.config.get("preprocessing", {})
+        cls_cfg = self.config.get("classification", {})
+        processed = preprocess_frame(frame, prep_cfg.get("resize_width"), int(prep_cfg.get("blur_kernel_size", 5)))
+
+        rois = extract_rois(processed, self.led_layout)
+        led_state: list[int] = []
+        confidences: list[float] = []
+        metrics_debug: list[dict[str, Any]] = []
+
+        for led_name in sorted(rois.keys()):
+            value = to_value_channel(rois[led_name])
+            features = compute_brightness_features(value, int(cls_cfg.get("brightness_threshold", 200)))
+            state, conf = classify_led_state(features, cls_cfg)
+            led_state.append(state)
+            confidences.append(conf)
+            metrics_debug.append({"name": led_name, "state": state, "mean": features["mean_brightness"], "max": features["max_brightness"], "ratio": features["bright_pixel_ratio"]})
+
+        dt_ms = (time.perf_counter() - start) * 1000
+        return DetectionResult(led_state=led_state, confidences=confidences, processing_time_ms=dt_ms, debug_info={"metrics": metrics_debug, "processed_frame": processed})
+
+    def save_debug(self, output_path: str | Path, result: DetectionResult) -> None:
+        overlay = draw_led_debug_overlay(result.debug_info["processed_frame"], result.debug_info["metrics"], self.led_layout)
+        save_debug_image(output_path, overlay)

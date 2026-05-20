@@ -1,0 +1,6 @@
+leds:
+  led_1: {x: 120, y: 80, width: 30, height: 30}
+  led_2: {x: 170, y: 80, width: 30, height: 30}
+  led_3: {x: 220, y: 80, width: 30, height: 30}
+  led_4: {x: 270, y: 80, width: 30, height: 30}
+  led_5: {x: 320, y: 80, width: 30, height: 30}
