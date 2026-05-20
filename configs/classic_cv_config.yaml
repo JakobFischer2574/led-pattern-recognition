@@ -2,11 +2,25 @@ preprocessing:
   resize_width: null
   blur_kernel_size: 5
 
+segmentation:
+  hsv_lower:
+    h: 35
+    s: 50
+    v: 80
+  hsv_upper:
+    h: 95
+    s: 255
+    v: 255
+  min_excess_green: 30
+
 classification:
   brightness_threshold: 200
   min_mean_brightness: 160
   min_max_brightness: 220
   min_bright_pixel_ratio: 0.10
+  min_green_pixel_ratio: 0.015
+  min_max_green_score: 40
+  min_largest_green_component_area: 8
 
 debug:
   save_debug_images: true

@@ -6,11 +6,11 @@ from typing import Any
 
 import numpy as np
 
-from src.classic_cv.feature_extraction import compute_brightness_features
+from src.classic_cv.feature_extraction import compute_brightness_features, compute_green_features
 from src.classic_cv.led_state_classifier import classify_led_state
 from src.classic_cv.preprocessing import preprocess_frame
 from src.classic_cv.roi_extraction import extract_rois
-from src.classic_cv.segmentation import to_value_channel
+from src.classic_cv.segmentation import create_green_led_mask, to_value_channel
 from src.detectors.base_detector import BaseDetector, DetectionResult
 from src.utils.image_debug import draw_led_debug_overlay, save_debug_image
 
@@ -32,8 +32,12 @@ class ClassicCVDetector(BaseDetector):
         metrics_debug: list[dict[str, Any]] = []
 
         for led_name in sorted(rois.keys()):
-            value = to_value_channel(rois[led_name])
-            features = compute_brightness_features(value, int(cls_cfg.get("brightness_threshold", 200)))
+            roi_img = rois[led_name]
+            value = to_value_channel(roi_img)
+            brightness_features = compute_brightness_features(value, int(cls_cfg.get("brightness_threshold", 200)))
+            green_mask, exg_score = create_green_led_mask(roi_img, self.config)
+            green_features = compute_green_features(green_mask, exg_score)
+            features = {**brightness_features, **green_features}
             state, conf = classify_led_state(features, cls_cfg)
             led_state.append(state)
             confidences.append(conf)
@@ -49,6 +53,12 @@ class ClassicCVDetector(BaseDetector):
                     "mean_brightness": float(features["mean_brightness"]),
                     "max_brightness": float(features["max_brightness"]),
                     "bright_pixel_ratio": float(features["bright_pixel_ratio"]),
+                    "green_area": float(features["green_area"]),
+                    "green_pixel_ratio": float(features["green_pixel_ratio"]),
+                    "mean_green_score": float(features["mean_green_score"]),
+                    "max_green_score": float(features["max_green_score"]),
+                    "largest_green_component_area": float(features["largest_green_component_area"]),
+                    "green_mask": green_mask,
                     "confidence": float(conf),
                     # Backward-compatible keys for existing overlay path.
                     "name": led_name,

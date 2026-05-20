@@ -49,6 +49,7 @@ def main() -> None:
                 debug_info=result.debug_info["metrics"],
                 save_roi_crops=bool(dbg_cfg.get("save_roi_crops", False)),
                 roi_scale=int(dbg_cfg.get("roi_crop_scale", 4)),
+                save_masks=bool(dbg_cfg.get("save_masks", False)),
             )
 
         row = {"frame_name": frame_path.name, "mean_latency_ms": round(result.processing_time_ms, 3)}
