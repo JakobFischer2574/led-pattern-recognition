@@ -2,10 +2,10 @@ from __future__ import annotations
 
 
 def classify_led_state(features: dict[str, float], thresholds: dict[str, float]) -> tuple[int, float]:
-    checks = [
-        features["mean_brightness"] >= thresholds["min_mean_brightness"],
-        features["max_brightness"] >= thresholds["min_max_brightness"],
-        features["bright_pixel_ratio"] >= thresholds["min_bright_pixel_ratio"],
+    green_checks = [
+        features["green_pixel_ratio"] >= float(thresholds.get("min_green_pixel_ratio", 0.015)),
+        features["max_green_score"] >= float(thresholds.get("min_max_green_score", 40.0)),
+        features["largest_green_component_area"] >= float(thresholds.get("min_largest_green_component_area", 8.0)),
     ]
-    confidence = sum(float(v) for v in checks) / len(checks)
-    return (1 if all(checks) else 0), confidence
+    confidence = sum(float(v) for v in green_checks) / len(green_checks)
+    return (1 if all(green_checks) else 0), confidence

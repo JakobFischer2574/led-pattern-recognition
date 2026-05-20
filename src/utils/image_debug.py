@@ -85,6 +85,13 @@ def draw_detection_debug_image(
             0.45,
         )
         y0 += line_h
+        draw_text(
+            f"g_ratio={float(led['green_pixel_ratio']):.3f} g_max={float(led['max_green_score']):.1f} g_cc={float(led['largest_green_component_area']):.1f}",
+            y0,
+            (160, 255, 160),
+            0.45,
+        )
+        y0 += line_h
         draw_text(f"roi=({led['x']},{led['y']},{led['width']},{led['height']})", y0, (180, 180, 180), 0.42)
         y0 += line_h + 4
         if y0 > h - 20:
@@ -102,6 +109,7 @@ def save_detection_debug_artifacts(
     debug_info: list[dict[str, Any]],
     save_roi_crops: bool = False,
     roi_scale: int = 4,
+    save_masks: bool = False,
 ) -> Path:
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -126,4 +134,16 @@ def save_detection_debug_artifacts(
             crop_name = crop_dir / f"{led['led_id']}_{'on' if int(led['state']) == 1 else 'off'}{ext}"
             save_debug_image(crop_name, enlarged)
 
+
+    if save_masks:
+        mask_dir = output_dir / "masks"
+        mask_dir.mkdir(parents=True, exist_ok=True)
+        stem = Path(frame_name).stem
+        for led in debug_info:
+            mask = led.get("green_mask")
+            if mask is None:
+                continue
+            mask_u8 = np.asarray(mask, dtype=np.uint8)
+            mask_name = mask_dir / f"{stem}_{led['led_id']}_mask.jpg"
+            save_debug_image(mask_name, mask_u8)
     return out_path
