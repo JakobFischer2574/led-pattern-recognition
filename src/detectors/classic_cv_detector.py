@@ -37,10 +37,34 @@ class ClassicCVDetector(BaseDetector):
             state, conf = classify_led_state(features, cls_cfg)
             led_state.append(state)
             confidences.append(conf)
-            metrics_debug.append({"name": led_name, "state": state, "mean": features["mean_brightness"], "max": features["max_brightness"], "ratio": features["bright_pixel_ratio"]})
+            roi = self.led_layout[led_name]
+            metrics_debug.append(
+                {
+                    "led_id": led_name,
+                    "x": int(roi["x"]),
+                    "y": int(roi["y"]),
+                    "width": int(roi["width"]),
+                    "height": int(roi["height"]),
+                    "state": state,
+                    "mean_brightness": float(features["mean_brightness"]),
+                    "max_brightness": float(features["max_brightness"]),
+                    "bright_pixel_ratio": float(features["bright_pixel_ratio"]),
+                    "confidence": float(conf),
+                    # Backward-compatible keys for existing overlay path.
+                    "name": led_name,
+                    "mean": float(features["mean_brightness"]),
+                    "max": float(features["max_brightness"]),
+                    "ratio": float(features["bright_pixel_ratio"]),
+                }
+            )
 
         dt_ms = (time.perf_counter() - start) * 1000
-        return DetectionResult(led_state=led_state, confidences=confidences, processing_time_ms=dt_ms, debug_info={"metrics": metrics_debug, "processed_frame": processed})
+        return DetectionResult(
+            led_state=led_state,
+            confidences=confidences,
+            processing_time_ms=dt_ms,
+            debug_info={"metrics": metrics_debug, "processed_frame": processed, "original_frame": frame},
+        )
 
     def save_debug(self, output_path: str | Path, result: DetectionResult) -> None:
         overlay = draw_led_debug_overlay(result.debug_info["processed_frame"], result.debug_info["metrics"], self.led_layout)
