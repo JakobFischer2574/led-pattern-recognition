@@ -1,4 +1,4 @@
-# LED Method Development
+# LED Pattern Recognition(LPR) - Entwicklungsphase
 
 Dieses Repository ist **bewusst eine Entwicklungsumgebung** für zwei visuelle Erkennungsansätze (Classic CV und YOLO-Gerüst) und **noch keine finale Evaluationspipeline**.
 

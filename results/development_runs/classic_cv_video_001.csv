@@ -1,0 +1,5 @@
+frame_name,mean_latency_ms,led_1,led_2,led_3,led_4,led_5
+video_001_frame_000000.jpg,28.797,1,1,1,0,0
+video_001_frame_000030.jpg,7.354,1,1,1,1,0
+video_001_frame_000060.jpg,9.137,1,1,1,1,0
+video_001_frame_000090.jpg,9.168,1,1,1,1,0

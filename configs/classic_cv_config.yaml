@@ -1,5 +1,5 @@
 preprocessing:
-  resize_width: 1280
+  resize_width: null
   blur_kernel_size: 5
 
 classification:
