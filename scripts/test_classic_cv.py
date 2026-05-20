@@ -8,6 +8,7 @@ import pandas as pd
 
 from src.detectors.classic_cv_detector import ClassicCVDetector
 from src.utils.config_loader import load_yaml_config
+from src.utils.image_debug import save_detection_debug_artifacts
 
 
 def iter_frames(path: Path) -> list[Path]:
@@ -38,7 +39,17 @@ def main() -> None:
         result = detector.detect(frame)
         print(f"{frame_path.name}: {result.led_state} ({result.processing_time_ms:.2f} ms)")
         if cfg.get("debug", {}).get("save_debug_images", False):
-            detector.save_debug(Path(args.debug_dir) / frame_path.name, result)
+            dbg_cfg = cfg.get("debug", {})
+            save_detection_debug_artifacts(
+                output_dir=Path(args.debug_dir),
+                frame=frame,
+                frame_name=frame_path.name,
+                layout_path=args.layout,
+                config_path=args.config,
+                debug_info=result.debug_info["metrics"],
+                save_roi_crops=bool(dbg_cfg.get("save_roi_crops", False)),
+                roi_scale=int(dbg_cfg.get("roi_crop_scale", 4)),
+            )
 
         row = {"frame_name": frame_path.name, "mean_latency_ms": round(result.processing_time_ms, 3)}
         for i, state in enumerate(result.led_state, start=1):
