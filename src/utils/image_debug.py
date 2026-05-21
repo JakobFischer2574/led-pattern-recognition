@@ -140,10 +140,15 @@ def save_detection_debug_artifacts(
         mask_dir.mkdir(parents=True, exist_ok=True)
         stem = Path(frame_name).stem
         for led in debug_info:
-            mask = led.get("green_mask")
-            if mask is None:
-                continue
-            mask_u8 = np.asarray(mask, dtype=np.uint8)
-            mask_name = mask_dir / f"{stem}_{led['led_id']}_mask.jpg"
-            save_debug_image(mask_name, mask_u8)
+            for mask_key, suffix in (
+                ("green_mask", "green"),
+                ("white_core_mask", "white_core"),
+                ("combined_led_mask", "combined_led"),
+            ):
+                mask = led.get(mask_key)
+                if mask is None:
+                    continue
+                mask_u8 = np.asarray(mask, dtype=np.uint8)
+                mask_name = mask_dir / f"{stem}_{led['led_id']}_{suffix}.jpg"
+                save_debug_image(mask_name, mask_u8)
     return out_path

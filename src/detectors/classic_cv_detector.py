@@ -10,7 +10,7 @@ from src.classic_cv.feature_extraction import compute_brightness_features, compu
 from src.classic_cv.led_state_classifier import classify_led_state
 from src.classic_cv.preprocessing import preprocess_frame
 from src.classic_cv.roi_extraction import extract_rois
-from src.classic_cv.segmentation import create_green_led_mask, to_value_channel
+from src.classic_cv.segmentation import create_led_masks, to_value_channel
 from src.detectors.base_detector import BaseDetector, DetectionResult
 from src.utils.image_debug import draw_led_debug_overlay, save_debug_image
 
@@ -24,6 +24,8 @@ class ClassicCVDetector(BaseDetector):
         start = time.perf_counter()
         prep_cfg = self.config.get("preprocessing", {})
         cls_cfg = self.config.get("classification", {})
+        seg_cfg = self.config.get("segmentation", {})
+        use_combined_led_mask = bool(seg_cfg.get("use_combined_led_mask_for_classification", True))
         processed = preprocess_frame(frame, prep_cfg.get("resize_width"), int(prep_cfg.get("blur_kernel_size", 5)))
 
         rois = extract_rois(processed, self.led_layout)
@@ -35,8 +37,14 @@ class ClassicCVDetector(BaseDetector):
             roi_img = rois[led_name]
             value = to_value_channel(roi_img)
             brightness_features = compute_brightness_features(value, int(cls_cfg.get("brightness_threshold", 200)))
-            green_mask, exg_score = create_green_led_mask(roi_img, self.config)
-            green_features = compute_green_features(green_mask, exg_score)
+            green_mask, white_core_mask, valid_white_core_mask, combined_led_mask, seg_debug = create_led_masks(roi_img, self.config)
+            classification_mask = combined_led_mask if use_combined_led_mask else green_mask
+            green_features = compute_green_features(
+                green_mask,
+                seg_debug["exg"],
+                classification_mask=classification_mask,
+                segmentation_debug={k: float(v) for k, v in seg_debug.items() if k != "exg"},
+            )
             features = {**brightness_features, **green_features}
             state, conf = classify_led_state(features, cls_cfg)
             led_state.append(state)
@@ -58,7 +66,14 @@ class ClassicCVDetector(BaseDetector):
                     "mean_green_score": float(features["mean_green_score"]),
                     "max_green_score": float(features["max_green_score"]),
                     "largest_green_component_area": float(features["largest_green_component_area"]),
+                    "white_core_area": float(features["white_core_area"]),
+                    "valid_white_core_area": float(features["valid_white_core_area"]),
+                    "combined_led_area": float(features["combined_led_area"]),
+                    "combined_largest_component_area": float(features["combined_largest_component_area"]),
                     "green_mask": green_mask,
+                    "white_core_mask": white_core_mask,
+                    "combined_led_mask": combined_led_mask,
+                    "classification_mask_type": "combined" if use_combined_led_mask else "green",
                     "confidence": float(conf),
                     # Backward-compatible keys for existing overlay path.
                     "name": led_name,
