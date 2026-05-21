@@ -1,6 +1,6 @@
 leds:
-  led_1: {x: 70, y: 410, width: 60, height: 60}
-  led_2: {x: 140, y: 420, width: 60, height: 60}
-  led_3: {x: 200, y: 410, width: 60, height: 60}
-  led_4: {x: 270, y: 410, width: 60, height: 60}
-  led_5: {x: 330, y: 420, width: 60, height: 60}
+  led_1: {x: 70, y: 410, width: 40, height: 40}
+  led_2: {x: 140, y: 420, width: 40, height: 40}
+  led_3: {x: 200, y: 410, width: 40, height: 40}
+  led_4: {x: 270, y: 410, width: 40, height: 40}
+  led_5: {x: 330, y: 420, width: 40, height: 40}

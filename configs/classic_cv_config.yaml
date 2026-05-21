@@ -18,9 +18,9 @@ classification:
   min_mean_brightness: 160
   min_max_brightness: 220
   min_bright_pixel_ratio: 0.10
-  min_green_pixel_ratio: 0.015
-  min_max_green_score: 40
-  min_largest_green_component_area: 8
+  min_green_pixel_ratio: 0.15
+  min_max_green_score: 300
+  min_largest_green_component_area: 500
 
 debug:
   save_debug_images: true

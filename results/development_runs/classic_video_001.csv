@@ -1,5 +1,11 @@
 frame_name,mean_latency_ms,led_1,led_2,led_3,led_4,led_5
-video_001_frame_000000.jpg,6.515,1,1,0,0,0
-video_001_frame_000030.jpg,2.231,1,1,0,1,0
-video_001_frame_000060.jpg,2.205,1,1,0,0,0
-video_001_frame_000090.jpg,2.266,1,1,0,0,0
+video_001_frame_000000.jpg,10.191,0,0,0,0,0
+video_001_frame_000010.jpg,5.458,0,0,0,0,1
+video_001_frame_000020.jpg,5.137,0,0,0,0,1
+video_001_frame_000030.jpg,5.283,0,0,0,1,0
+video_001_frame_000040.jpg,4.842,0,0,1,0,0
+video_001_frame_000050.jpg,6.156,0,0,1,0,0
+video_001_frame_000060.jpg,5.246,0,1,0,0,0
+video_001_frame_000070.jpg,4.345,0,1,0,0,0
+video_001_frame_000080.jpg,6.145,1,0,0,0,0
+video_001_frame_000090.jpg,5.571,1,0,0,0,0
