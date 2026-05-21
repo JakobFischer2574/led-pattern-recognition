@@ -3,6 +3,7 @@ preprocessing:
   blur_kernel_size: 5
 
 segmentation:
+  use_combined_led_mask_for_classification: true
   hsv_lower:
     h: 35
     s: 50
@@ -12,6 +13,12 @@ segmentation:
     s: 255
     v: 255
   min_excess_green: 30
+  white_core:
+    max_saturation: 80
+    min_value: 230
+  white_core_adjacency:
+    dilate_kernel_size: 3
+    dilate_iterations: 1
 
 classification:
   brightness_threshold: 200
