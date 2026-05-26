@@ -57,3 +57,31 @@ Ohne Modellpfad wird absichtlich eine klare Fehlermeldung ausgegeben.
 - Temporale Blinkmustererkennung (Sequenzen statt Einzelframes).
 - Vollständiger YOLO-Trainingsprozess inkl. Datensatzversionierung.
 - Ressourcenmessung (CPU/RAM/Energie) für fairen Methodenvergleich.
+
+## Slot-based LED localization
+
+Feste ROIs aus `configs/led_layout.yaml` sind als Startpunkt für kalibrierte Laborbilder nützlich, aber bei Verschiebungen des Router-Mockups entlang x/y/z nicht robust genug.
+
+Der `SlotBasedLEDLocator` nutzt stattdessen dunkle vertikale LED-Öffnungen als **zustandsunabhängige Strukturmerkmale**:
+- Suchregion relativ zur Bildgröße,
+- Segmentierung dunkler vertikaler Strukturen,
+- Konturfilter (Höhe/Breite/Fläche/Aspekt),
+- geometrische Plausibilisierung einer horizontalen 5er-Gruppe,
+- Ableitung der finalen LED-ROIs aus Slot-Zentren.
+
+Wichtig: Es gibt **keinen blinden Fallback auf feste ROIs** bei Locator-Fehlern. Wenn weder automatische Lokalisierung noch kurzfristiger Tracking-Fallback möglich ist, liefert der Classic-CV-Detektor:
+- `locator_status="failed"`
+- `led_state=[-1, -1, -1, -1, -1]` (unknown / nicht auswertbar)
+
+### Slot-Locator testen
+```bash
+python scripts/test_slot_locator.py --input data/sampled_frames/video_001 --config configs/classic_cv_config.yaml --output data/debug/slot_locator
+```
+
+### Debug-Bilder interpretieren
+- **Cyan**: Search Region.
+- **Gelb**: alle erkannten Slot-Kandidaten.
+- **Blau**: geometrisch ausgewählte fünf Slot-Kandidaten.
+- **Grün/Rot**: finale LED-ROIs (ON/OFF bei Classic-CV-Detektion).
+- Overlay-Text `LOCATOR FAILED` bzw. `TRACKED FALLBACK` zeigt den Locator-Zustand.
+- Rechtes Panel zeigt zusätzlich Locator-Metadaten (`locator_type`, `locator_status`, `locator_confidence`, Kandidatenzahlen, ROI-Koordinaten, ggf. `fallback_counter`).

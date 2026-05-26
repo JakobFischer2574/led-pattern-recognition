@@ -12,6 +12,8 @@ class DetectionResult:
     led_state: list[int]
     confidences: list[float]
     processing_time_ms: float
+    locator_status: str = "ok"
+    locator_confidence: float = 1.0
     debug_info: dict[str, Any] = field(default_factory=dict)
 
 

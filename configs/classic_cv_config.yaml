@@ -2,6 +2,35 @@ preprocessing:
   resize_width: null
   blur_kernel_size: 5
 
+locator:
+  type: slot_based
+  search_region:
+    x_min_ratio: 0.05
+    x_max_ratio: 0.95
+    y_min_ratio: 0.35
+    y_max_ratio: 0.90
+  slot_detection:
+    dark_threshold: 90
+    min_area: 40
+    max_area: 3000
+    min_height: 15
+    max_width: 80
+    min_aspect_ratio: 1.2
+    morphology_kernel_size: 3
+  geometry:
+    expected_led_count: 5
+    max_y_deviation_px: 40
+    max_spacing_deviation_ratio: 0.45
+  roi:
+    width: 40
+    height: 40
+    offset_x: 0
+    offset_y: 0
+  tracking:
+    enabled: true
+    max_tracking_fallback_frames: 5
+    fallback_confidence: 0.5
+
 segmentation:
   use_combined_led_mask_for_classification: true
   hsv_lower:

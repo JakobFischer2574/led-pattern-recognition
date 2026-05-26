@@ -12,9 +12,14 @@ from src.utils.image_debug import save_detection_debug_artifacts
 
 
 def iter_frames(path: Path) -> list[Path]:
+    if not path.exists():
+        raise FileNotFoundError(f"Input-Pfad nicht gefunden: {path}")
     if path.is_file():
         return [path]
-    return sorted([p for p in path.iterdir() if p.suffix.lower() in {'.jpg', '.jpeg', '.png'}])
+    frames = sorted([p for p in path.iterdir() if p.suffix.lower() in {'.jpg', '.jpeg', '.png'}])
+    if not frames:
+        raise ValueError(f"Keine Bilddateien in Ordner gefunden: {path}")
+    return frames
 
 
 def main() -> None:
@@ -27,7 +32,10 @@ def main() -> None:
     args = parser.parse_args()
 
     cfg = load_yaml_config(args.config)
-    layout = load_yaml_config(args.layout)["leds"]
+    layout = load_yaml_config(args.layout).get("leds")
+    if not isinstance(layout, dict):
+        raise ValueError("Ungültiges Layout: 'leds' fehlt oder ist kein dict")
+
     detector = ClassicCVDetector(cfg, layout)
 
     rows = []
@@ -37,7 +45,7 @@ def main() -> None:
             print(f"WARN: übersprungen (nicht lesbar): {frame_path}")
             continue
         result = detector.detect(frame)
-        print(f"{frame_path.name}: {result.led_state} ({result.processing_time_ms:.2f} ms)")
+        print(f"{frame_path.name}: {result.led_state} locator={result.locator_status} ({result.processing_time_ms:.2f} ms)")
         if cfg.get("debug", {}).get("save_debug_images", False):
             dbg_cfg = cfg.get("debug", {})
             save_detection_debug_artifacts(
@@ -46,13 +54,22 @@ def main() -> None:
                 frame_name=frame_path.name,
                 layout_path=args.layout,
                 config_path=args.config,
-                debug_info=result.debug_info["metrics"],
+                debug_info=result.debug_info.get("metrics", []),
                 save_roi_crops=bool(dbg_cfg.get("save_roi_crops", False)),
                 roi_scale=int(dbg_cfg.get("roi_crop_scale", 4)),
                 save_masks=bool(dbg_cfg.get("save_masks", False)),
+                locator_data=result.debug_info.get("locator", {}),
+                locator_type=result.debug_info.get("locator_type", "n/a"),
+                locator_status=result.locator_status,
+                locator_confidence=result.locator_confidence,
             )
 
-        row = {"frame_name": frame_path.name, "mean_latency_ms": round(result.processing_time_ms, 3)}
+        row = {
+            "frame_name": frame_path.name,
+            "mean_latency_ms": round(result.processing_time_ms, 3),
+            "locator_status": result.locator_status,
+            "locator_confidence": round(result.locator_confidence, 3),
+        }
         for i, state in enumerate(result.led_state, start=1):
             row[f"led_{i}"] = state
         rows.append(row)
