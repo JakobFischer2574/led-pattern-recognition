@@ -25,7 +25,7 @@ locator:
     width: 40
     height: 40
     offset_x: 0
-    offset_y: 0
+    offset_y: -20
   tracking:
     enabled: true
     max_tracking_fallback_frames: 5
@@ -54,9 +54,14 @@ classification:
   min_mean_brightness: 160
   min_max_brightness: 220
   min_bright_pixel_ratio: 0.10
-  min_green_pixel_ratio: 0.2
-  min_max_green_score: 300
-  min_largest_green_component_area: 500
+  min_green_pixel_ratio: 0.08
+  min_max_green_score: 180
+  min_largest_green_component_area: 100
+
+  min_valid_white_core_area: 8
+  min_bright_max: 230
+  min_combined_component_area: 80
 
 debug:
   save_debug_images: true
+

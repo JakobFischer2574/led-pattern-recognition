@@ -116,14 +116,6 @@ def draw_detection_debug_image(
     thresholds_cfg = _load_thresholds_from_config(config_path)
 
     threshold_specs: list[tuple[str, list[tuple[str, ...]]]] = [
-        ("classification.min_green_pixel_ratio", [("classification", "min_green_pixel_ratio")]),
-        ("classification.min_max_green_score", [("classification", "min_max_green_score")]),
-        ("classification.min_largest_green_component_area", [("classification", "min_largest_green_component_area")]),
-        ("segmentation.min_excess_green", [("segmentation", "min_excess_green")]),
-        ("segmentation.hsv_lower", [("segmentation", "hsv_lower"), ("segmentation", "green_hsv_lower")]),
-        ("segmentation.hsv_upper", [("segmentation", "hsv_upper"), ("segmentation", "green_hsv_upper")]),
-        ("segmentation.white_core.max_saturation", [("segmentation", "white_core", "max_saturation")]),
-        ("segmentation.white_core.min_value", [("segmentation", "white_core", "min_value")]),
         ("locator.roi.width", [("locator", "roi", "width")]),
         ("locator.roi.height", [("locator", "roi", "height")]),
         ("locator.roi.offset_x", [("locator", "roi", "offset_x")]),
