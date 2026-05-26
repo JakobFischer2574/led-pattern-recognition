@@ -11,9 +11,9 @@ def draw_led_debug_overlay(frame: np.ndarray, led_metrics: list[dict[str, Any]],
     canvas = frame.copy()
     for idx, (name, roi) in enumerate(rois.items()):
         x, y, w, h = roi["x"], roi["y"], roi["width"], roi["height"]
-        metrics = led_metrics[idx]
+        metrics = led_metrics[idx] if idx < len(led_metrics) else {"state": -1, "mean": 0.0, "max": 0.0, "ratio": 0.0}
         state = metrics["state"]
-        color = (0, 255, 0) if state == 1 else (0, 0, 255)
+        color = (0, 255, 0) if state == 1 else ((0, 0, 255) if state == 0 else (0, 140, 255))
         cv2.rectangle(canvas, (x, y), (x + w, y + h), color, 2)
         text = f"{name}:{state} m={metrics['mean']:.1f} mx={metrics['max']:.1f} r={metrics['ratio']:.2f}"
         cv2.putText(canvas, text, (x, max(20, y - 8)), cv2.FONT_HERSHEY_SIMPLEX, 0.4, color, 1, cv2.LINE_AA)
@@ -34,11 +34,27 @@ def draw_detection_debug_image(
     layout_path: str | Path,
     config_path: str | Path,
     info_panel_width: int = 520,
+    locator_data: dict[str, Any] | None = None,
+    locator_type: str = "n/a",
+    locator_status: str = "ok",
+    locator_confidence: float = 1.0,
 ) -> np.ndarray:
-    """Erstellt ein Debug-Bild mit Originalframe (links) und Info-Panel (rechts)."""
     base = frame.copy()
     h, w = base.shape[:2]
     panel = np.full((h, info_panel_width, 3), 25, dtype=np.uint8)
+
+    locator_data = locator_data or {}
+    search_region = locator_data.get("search_region")
+    if search_region:
+        x, y = int(search_region["x"]), int(search_region["y"])
+        rw, rh = int(search_region["width"]), int(search_region["height"])
+        cv2.rectangle(base, (x, y), (x + rw, y + rh), (255, 255, 0), 2)
+
+    for c in locator_data.get("all_candidates", []):
+        cv2.rectangle(base, (int(c["x"]), int(c["y"])), (int(c["x"] + c["width"]), int(c["y"] + c["height"])), (0, 255, 255), 1)
+
+    for c in locator_data.get("selected_candidates", []):
+        cv2.rectangle(base, (int(c["x"]), int(c["y"])), (int(c["x"] + c["width"]), int(c["y"] + c["height"])), (255, 0, 0), 2)
 
     for led in debug_info:
         x = int(led["x"])
@@ -48,6 +64,11 @@ def draw_detection_debug_image(
         state = int(led["state"])
         color = (0, 200, 0) if state == 1 else (0, 0, 220)
         cv2.rectangle(base, (x, y), (x + rw, y + rh), color, 2)
+
+    if locator_status == "failed":
+        cv2.putText(base, "LOCATOR FAILED", (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 255), 3, cv2.LINE_AA)
+    elif locator_status == "tracked_fallback":
+        cv2.putText(base, "TRACKED FALLBACK", (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 165, 255), 3, cv2.LINE_AA)
 
     canvas = np.hstack([base, panel])
     x0 = w + 12
@@ -59,41 +80,24 @@ def draw_detection_debug_image(
         cv2.rectangle(canvas, (x0 - 4, y - th - 4), (x0 + tw + 4, y + 4), (0, 0, 0), -1)
         cv2.putText(canvas, line, (x0, y), cv2.FONT_HERSHEY_SIMPLEX, scale, color, 1, cv2.LINE_AA)
 
-    draw_text("Classic-CV Debug", y0, (255, 220, 120), 0.6)
-    y0 += line_h
-    draw_text(f"Frame: {frame_name}", y0)
-    y0 += line_h
-    draw_text(f"Layout: {Path(layout_path).name}", y0)
-    y0 += line_h
-    draw_text(f"Config: {Path(config_path).name}", y0)
-    y0 += line_h + 6
+    draw_text("Classic-CV Debug", y0, (255, 220, 120), 0.6); y0 += line_h
+    draw_text(f"Frame: {frame_name}", y0); y0 += line_h
+    draw_text(f"Layout: {Path(layout_path).name}", y0); y0 += line_h
+    draw_text(f"Config: {Path(config_path).name}", y0); y0 += line_h
+    draw_text(f"locator_type: {locator_type}", y0); y0 += line_h
+    draw_text(f"locator_status: {locator_status}", y0); y0 += line_h
+    draw_text(f"locator_conf: {locator_confidence:.3f}", y0); y0 += line_h
+    draw_text(f"candidates: {locator_data.get('candidate_count', 0)}", y0); y0 += line_h
+    draw_text(f"selected: {locator_data.get('selected_count', 0)}", y0); y0 += line_h
+    if "fallback_counter" in locator_data:
+        draw_text(f"fallback_counter: {locator_data['fallback_counter']}", y0); y0 += line_h
+    y0 += 6
 
     for led in debug_info:
         state = int(led["state"])
         color = (0, 200, 0) if state == 1 else (0, 0, 220)
-        draw_text(
-            f"{led['led_id']}: {'ON' if state == 1 else 'OFF'} conf={float(led['confidence']):.3f}",
-            y0,
-            color,
-            0.5,
-        )
-        y0 += line_h
-        draw_text(
-            f"mean={float(led['mean_brightness']):.1f} max={float(led['max_brightness']):.1f} ratio={float(led['bright_pixel_ratio']):.3f}",
-            y0,
-            (220, 220, 220),
-            0.45,
-        )
-        y0 += line_h
-        draw_text(
-            f"g_ratio={float(led['green_pixel_ratio']):.3f} g_max={float(led['max_green_score']):.1f} g_cc={float(led['largest_green_component_area']):.1f}",
-            y0,
-            (160, 255, 160),
-            0.45,
-        )
-        y0 += line_h
-        draw_text(f"roi=({led['x']},{led['y']},{led['width']},{led['height']})", y0, (180, 180, 180), 0.42)
-        y0 += line_h + 4
+        draw_text(f"{led['led_id']}: {'ON' if state == 1 else 'OFF'} conf={float(led['confidence']):.3f}", y0, color, 0.5); y0 += line_h
+        draw_text(f"roi=({led['x']},{led['y']},{led['width']},{led['height']})", y0, (180, 180, 180), 0.42); y0 += line_h + 4
         if y0 > h - 20:
             break
 
@@ -110,45 +114,18 @@ def save_detection_debug_artifacts(
     save_roi_crops: bool = False,
     roi_scale: int = 4,
     save_masks: bool = False,
+    locator_data: dict[str, Any] | None = None,
+    locator_type: str = "n/a",
+    locator_status: str = "ok",
+    locator_confidence: float = 1.0,
 ) -> Path:
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
-    composed = draw_detection_debug_image(frame, debug_info, frame_name, layout_path, config_path)
+    composed = draw_detection_debug_image(
+        frame, debug_info, frame_name, layout_path, config_path,
+        locator_data=locator_data, locator_type=locator_type,
+        locator_status=locator_status, locator_confidence=locator_confidence,
+    )
     out_path = output_dir / frame_name
     save_debug_image(out_path, composed)
-
-    if save_roi_crops:
-        stem = Path(frame_name).stem
-        ext = Path(frame_name).suffix or ".png"
-        crop_dir = output_dir / f"{stem}_roi_crops"
-        crop_dir.mkdir(parents=True, exist_ok=True)
-        for led in debug_info:
-            x, y = int(led["x"]), int(led["y"])
-            rw, rh = int(led["width"]), int(led["height"])
-            crop = frame[max(0, y):max(0, y + rh), max(0, x):max(0, x + rw)]
-            if crop.size == 0:
-                continue
-            enlarged = cv2.resize(crop, (rw * max(1, roi_scale), rh * max(1, roi_scale)), interpolation=cv2.INTER_NEAREST)
-            color = (0, 200, 0) if int(led["state"]) == 1 else (0, 0, 220)
-            cv2.rectangle(enlarged, (0, 0), (enlarged.shape[1] - 1, enlarged.shape[0] - 1), color, 2)
-            crop_name = crop_dir / f"{led['led_id']}_{'on' if int(led['state']) == 1 else 'off'}{ext}"
-            save_debug_image(crop_name, enlarged)
-
-
-    if save_masks:
-        mask_dir = output_dir / "masks"
-        mask_dir.mkdir(parents=True, exist_ok=True)
-        stem = Path(frame_name).stem
-        for led in debug_info:
-            for mask_key, suffix in (
-                ("green_mask", "green"),
-                ("white_core_mask", "white_core"),
-                ("combined_led_mask", "combined_led"),
-            ):
-                mask = led.get(mask_key)
-                if mask is None:
-                    continue
-                mask_u8 = np.asarray(mask, dtype=np.uint8)
-                mask_name = mask_dir / f"{stem}_{led['led_id']}_{suffix}.jpg"
-                save_debug_image(mask_name, mask_u8)
     return out_path

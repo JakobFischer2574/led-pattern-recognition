@@ -8,8 +8,8 @@ import numpy as np
 
 from src.classic_cv.feature_extraction import compute_brightness_features, compute_green_features
 from src.classic_cv.led_state_classifier import classify_led_state
+from src.classic_cv.locators import FixedROILocator, SlotBasedLEDLocator, TrackingLEDLocator
 from src.classic_cv.preprocessing import preprocess_frame
-from src.classic_cv.roi_extraction import extract_rois
 from src.classic_cv.segmentation import create_led_masks, to_value_channel
 from src.detectors.base_detector import BaseDetector, DetectionResult
 from src.utils.image_debug import draw_led_debug_overlay, save_debug_image
@@ -19,6 +19,22 @@ class ClassicCVDetector(BaseDetector):
     def __init__(self, config: dict[str, Any], led_layout: dict[str, dict[str, int]]) -> None:
         self.config = config
         self.led_layout = led_layout
+        locator_cfg = config.get("locator", {})
+        locator_type = str(locator_cfg.get("type", "fixed_roi"))
+        if locator_type == "fixed_roi":
+            self.locator = FixedROILocator(led_layout)
+        elif locator_type == "slot_based":
+            slot_locator = SlotBasedLEDLocator(locator_cfg)
+            tracking_cfg = locator_cfg.get("tracking", {})
+            self.locator = TrackingLEDLocator(
+                slot_locator,
+                enabled=bool(tracking_cfg.get("enabled", True)),
+                max_tracking_fallback_frames=int(tracking_cfg.get("max_tracking_fallback_frames", 5)),
+                fallback_confidence=float(tracking_cfg.get("fallback_confidence", 0.5)),
+            )
+        else:
+            raise ValueError(f"Ungültiger locator.type: {locator_type}. Erlaubt: fixed_roi, slot_based")
+        self.locator_type = locator_type
 
     def detect(self, frame: np.ndarray) -> DetectionResult:
         start = time.perf_counter()
@@ -28,13 +44,32 @@ class ClassicCVDetector(BaseDetector):
         use_combined_led_mask = bool(seg_cfg.get("use_combined_led_mask_for_classification", True))
         processed = preprocess_frame(frame, prep_cfg.get("resize_width"), int(prep_cfg.get("blur_kernel_size", 5)))
 
-        rois = extract_rois(processed, self.led_layout)
+        locator_result = self.locator.locate(processed)
+        if locator_result.status == "failed" or len(locator_result.regions) != 5:
+            dt_ms = (time.perf_counter() - start) * 1000
+            return DetectionResult(
+                led_state=[-1, -1, -1, -1, -1],
+                confidences=[0.0, 0.0, 0.0, 0.0, 0.0],
+                processing_time_ms=dt_ms,
+                locator_status="failed",
+                locator_confidence=0.0,
+                debug_info={
+                    "metrics": [],
+                    "processed_frame": processed,
+                    "original_frame": frame,
+                    "locator": locator_result.debug_info,
+                    "locator_status": "failed",
+                },
+            )
+
         led_state: list[int] = []
         confidences: list[float] = []
         metrics_debug: list[dict[str, Any]] = []
 
-        for led_name in sorted(rois.keys()):
-            roi_img = rois[led_name]
+        sorted_regions = sorted(locator_result.regions, key=lambda r: r.led_id)
+        for region in sorted_regions:
+            x, y, w, h = region.x, region.y, region.width, region.height
+            roi_img = processed[y : y + h, x : x + w]
             value = to_value_channel(roi_img)
             brightness_features = compute_brightness_features(value, int(cls_cfg.get("brightness_threshold", 200)))
             green_mask, white_core_mask, valid_white_core_mask, combined_led_mask, seg_debug = create_led_masks(roi_img, self.config)
@@ -49,14 +84,13 @@ class ClassicCVDetector(BaseDetector):
             state, conf = classify_led_state(features, cls_cfg)
             led_state.append(state)
             confidences.append(conf)
-            roi = self.led_layout[led_name]
             metrics_debug.append(
                 {
-                    "led_id": led_name,
-                    "x": int(roi["x"]),
-                    "y": int(roi["y"]),
-                    "width": int(roi["width"]),
-                    "height": int(roi["height"]),
+                    "led_id": region.led_id,
+                    "x": x,
+                    "y": y,
+                    "width": w,
+                    "height": h,
                     "state": state,
                     "mean_brightness": float(features["mean_brightness"]),
                     "max_brightness": float(features["max_brightness"]),
@@ -75,8 +109,7 @@ class ClassicCVDetector(BaseDetector):
                     "combined_led_mask": combined_led_mask,
                     "classification_mask_type": "combined" if use_combined_led_mask else "green",
                     "confidence": float(conf),
-                    # Backward-compatible keys for existing overlay path.
-                    "name": led_name,
+                    "name": region.led_id,
                     "mean": float(features["mean_brightness"]),
                     "max": float(features["max_brightness"]),
                     "ratio": float(features["bright_pixel_ratio"]),
@@ -88,9 +121,20 @@ class ClassicCVDetector(BaseDetector):
             led_state=led_state,
             confidences=confidences,
             processing_time_ms=dt_ms,
-            debug_info={"metrics": metrics_debug, "processed_frame": processed, "original_frame": frame},
+            locator_status=locator_result.status,
+            locator_confidence=float(locator_result.confidence),
+            debug_info={
+                "metrics": metrics_debug,
+                "processed_frame": processed,
+                "original_frame": frame,
+                "locator": locator_result.debug_info,
+                "locator_status": locator_result.status,
+                "locator_confidence": float(locator_result.confidence),
+                "locator_type": self.locator_type,
+            },
         )
 
     def save_debug(self, output_path: str | Path, result: DetectionResult) -> None:
-        overlay = draw_led_debug_overlay(result.debug_info["processed_frame"], result.debug_info["metrics"], self.led_layout)
+        rois = {m["led_id"]: {"x": m["x"], "y": m["y"], "width": m["width"], "height": m["height"]} for m in result.debug_info.get("metrics", [])}
+        overlay = draw_led_debug_overlay(result.debug_info["processed_frame"], result.debug_info.get("metrics", []), rois)
         save_debug_image(output_path, overlay)
