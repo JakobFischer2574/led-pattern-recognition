@@ -7,6 +7,45 @@ import cv2
 import numpy as np
 
 
+def _load_thresholds_from_config(config_path: str | Path) -> dict[str, Any] | None:
+    try:
+        import yaml  # type: ignore
+    except Exception:
+        return None
+
+    try:
+        with Path(config_path).open("r", encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+            return data if isinstance(data, dict) else None
+    except Exception:
+        return None
+
+
+def _get_nested_value(data: dict[str, Any] | None, candidate_paths: list[tuple[str, ...]]) -> Any:
+    if not isinstance(data, dict):
+        return "n/a"
+
+    for path in candidate_paths:
+        cur: Any = data
+        ok = True
+        for key in path:
+            if not isinstance(cur, dict) or key not in cur:
+                ok = False
+                break
+            cur = cur[key]
+        if ok:
+            return cur
+    return "n/a"
+
+
+def _format_value(v: Any, precision: int = 3) -> str:
+    if v is None:
+        return "n/a"
+    if isinstance(v, float):
+        return f"{v:.{precision}f}"
+    return str(v)
+
+
 def draw_led_debug_overlay(frame: np.ndarray, led_metrics: list[dict[str, Any]], rois: dict[str, dict[str, int]]) -> np.ndarray:
     canvas = frame.copy()
     for idx, (name, roi) in enumerate(rois.items()):
@@ -72,8 +111,24 @@ def draw_detection_debug_image(
 
     canvas = np.hstack([base, panel])
     x0 = w + 12
-    line_h = 20
+    line_h = 18
     y0 = 28
+    thresholds_cfg = _load_thresholds_from_config(config_path)
+
+    threshold_specs: list[tuple[str, list[tuple[str, ...]]]] = [
+        ("classification.min_green_pixel_ratio", [("classification", "min_green_pixel_ratio")]),
+        ("classification.min_max_green_score", [("classification", "min_max_green_score")]),
+        ("classification.min_largest_green_component_area", [("classification", "min_largest_green_component_area")]),
+        ("segmentation.min_excess_green", [("segmentation", "min_excess_green")]),
+        ("segmentation.hsv_lower", [("segmentation", "hsv_lower"), ("segmentation", "green_hsv_lower")]),
+        ("segmentation.hsv_upper", [("segmentation", "hsv_upper"), ("segmentation", "green_hsv_upper")]),
+        ("segmentation.white_core.max_saturation", [("segmentation", "white_core", "max_saturation")]),
+        ("segmentation.white_core.min_value", [("segmentation", "white_core", "min_value")]),
+        ("locator.roi.width", [("locator", "roi", "width")]),
+        ("locator.roi.height", [("locator", "roi", "height")]),
+        ("locator.roi.offset_x", [("locator", "roi", "offset_x")]),
+        ("locator.roi.offset_y", [("locator", "roi", "offset_y")]),
+    ]
 
     def draw_text(line: str, y: int, color: tuple[int, int, int] = (245, 245, 245), scale: float = 0.5) -> None:
         (tw, th), _ = cv2.getTextSize(line, cv2.FONT_HERSHEY_SIMPLEX, scale, 1)
@@ -91,13 +146,51 @@ def draw_detection_debug_image(
     draw_text(f"selected: {locator_data.get('selected_count', 0)}", y0); y0 += line_h
     if "fallback_counter" in locator_data:
         draw_text(f"fallback_counter: {locator_data['fallback_counter']}", y0); y0 += line_h
+    draw_text("thresholds:", y0, (255, 220, 120), 0.5); y0 += line_h
+    if thresholds_cfg is None:
+        draw_text("thresholds=n/a", y0, (180, 180, 180), 0.42); y0 += line_h
+    else:
+        for label, candidates in threshold_specs:
+            draw_text(f"{label}={_format_value(_get_nested_value(thresholds_cfg, candidates))}", y0, (180, 180, 180), 0.40)
+            y0 += line_h
     y0 += 6
 
     for led in debug_info:
-        state = int(led["state"])
+        state_raw = led.get("state", -1)
+        state = int(state_raw) if isinstance(state_raw, (int, np.integer, float)) else -1
+        state_str = "ON" if state == 1 else ("OFF" if state == 0 else "UNKNOWN")
         color = (0, 200, 0) if state == 1 else (0, 0, 220)
-        draw_text(f"{led['led_id']}: {'ON' if state == 1 else 'OFF'} conf={float(led['confidence']):.3f}", y0, color, 0.5); y0 += line_h
-        draw_text(f"roi=({led['x']},{led['y']},{led['width']},{led['height']})", y0, (180, 180, 180), 0.42); y0 += line_h + 4
+        draw_text(f"{_format_value(led.get('led_id'))}: {state_str} conf={_format_value(led.get('confidence'))}", y0, color, 0.45); y0 += line_h
+        draw_text(
+            f"roi=({_format_value(led.get('x'))},{_format_value(led.get('y'))},{_format_value(led.get('width'))},{_format_value(led.get('height'))})",
+            y0,
+            (180, 180, 180),
+            0.40,
+        ); y0 += line_h
+        draw_text(
+            f"bright mean={_format_value(led.get('mean_brightness'))} max={_format_value(led.get('max_brightness'))} ratio={_format_value(led.get('bright_pixel_ratio'))}",
+            y0,
+            (170, 210, 255),
+            0.38,
+        ); y0 += line_h
+        draw_text(
+            f"green ratio={_format_value(led.get('green_pixel_ratio'))} max_score={_format_value(led.get('max_green_score'))} largest={_format_value(led.get('largest_green_component_area'))}",
+            y0,
+            (140, 255, 140),
+            0.38,
+        ); y0 += line_h
+        draw_text(
+            f"areas g={_format_value(led.get('green_area'))} w={_format_value(led.get('white_core_area'))} valid_w={_format_value(led.get('valid_white_core_area'))}",
+            y0,
+            (255, 220, 170),
+            0.38,
+        ); y0 += line_h
+        draw_text(
+            f"combined area={_format_value(led.get('combined_led_area'))} largest={_format_value(led.get('combined_largest_component_area'))}",
+            y0,
+            (255, 220, 170),
+            0.38,
+        ); y0 += line_h + 3
         if y0 > h - 20:
             break
 
@@ -118,11 +211,13 @@ def save_detection_debug_artifacts(
     locator_type: str = "n/a",
     locator_status: str = "ok",
     locator_confidence: float = 1.0,
+    info_panel_width: int = 720,
 ) -> Path:
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     composed = draw_detection_debug_image(
         frame, debug_info, frame_name, layout_path, config_path,
+        info_panel_width=info_panel_width,
         locator_data=locator_data, locator_type=locator_type,
         locator_status=locator_status, locator_confidence=locator_confidence,
     )
