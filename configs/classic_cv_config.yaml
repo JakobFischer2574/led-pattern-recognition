@@ -6,8 +6,8 @@ locator:
   search_region:
     x_min_ratio: 0.05
     x_max_ratio: 0.95
-    y_min_ratio: 0.35
-    y_max_ratio: 0.9
+    y_min_ratio: 0.34
+    y_max_ratio: 0.92
   slot_band:
     enabled: true
     y_min_ratio: 0.45
@@ -24,17 +24,17 @@ locator:
     min_peak_prominence: 5
     smoothing_window_px: 7
   slot_detection:
-    dark_threshold: 90
-    min_area: 40
-    max_area: 3000
-    min_height: 15
-    max_width: 80
-    min_aspect_ratio: 1.2
+    dark_threshold: 60
+    min_area: 80
+    max_area: 1600
+    min_height: 10
+    max_width: 55
+    min_aspect_ratio: 1.5
     morphology_kernel_size: 3
   geometry:
     expected_led_count: 5
-    max_y_deviation_px: 40
-    max_spacing_deviation_ratio: 0.45
+    max_y_deviation_px: 20
+    max_spacing_deviation_ratio: 0.25
     min_candidates_for_reconstruction: 3
   roi:
     width: 40
@@ -42,7 +42,7 @@ locator:
     offset_x: 0
     offset_y: -20
     dynamic_size_enabled: true
-    width_factor: 5.0
+    width_factor: 3
     height_factor: 1.5
     min_width: 28
     max_width: 80
