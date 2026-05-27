@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from itertools import combinations
 from typing import Any
 
 import cv2
@@ -71,43 +70,75 @@ class SlotBasedLEDLocator(BaseLEDLocator):
             candidates.append((x + x0, y + y0, w, h))
         return sorted(candidates, key=lambda b: b[0] + b[2] / 2.0)
 
-    def _score_group(self, group: list[tuple[int, int, int, int]]) -> float:
-        centers = [x + w / 2.0 for x, _, w, _ in group]
-        y_centers = [y + h / 2.0 for _, y, _, h in group]
-        spacings = [centers[i + 1] - centers[i] for i in range(len(centers) - 1)]
-        mean_spacing = max(1.0, float(np.mean(spacings)))
-        spacing_dev = float(np.std(spacings) / mean_spacing)
-        y_dev = float(np.std(y_centers))
-        return spacing_dev + (y_dev / 100.0)
-
-    def _select_plausible_five(self, candidates: list[tuple[int, int, int, int]]) -> list[tuple[int, int, int, int]]:
-        max_y_dev = float(self.geometry.get("max_y_deviation_px", 40))
+    def _select_best_row_group(
+        self, candidates: list[tuple[int, int, int, int]]
+    ) -> tuple[list[tuple[int, int, int, int]], list[tuple[int, int, int, int]], float | None, float | None]:
+        max_y_dev = float(self.geometry.get("max_y_deviation_px", 25))
         max_spacing_dev_ratio = float(self.geometry.get("max_spacing_deviation_ratio", 0.45))
-        if len(candidates) < self.expected_led_count:
-            return []
+        min_candidates = int(self.geometry.get("min_candidates_for_reconstruction", 3))
+        if len(candidates) < min_candidates:
+            return [], candidates.copy(), None, None
+
+        sorted_candidates = sorted(candidates, key=lambda c: c[1] + c[3] / 2.0)
+        groups: list[list[tuple[int, int, int, int]]] = []
+        for c in sorted_candidates:
+            cy = c[1] + c[3] / 2.0
+            placed = False
+            for g in groups:
+                g_ys = [gy + gh / 2.0 for _, gy, _, gh in g]
+                if abs(cy - float(np.median(g_ys))) <= max_y_dev:
+                    g.append(c)
+                    placed = True
+                    break
+            if not placed:
+                groups.append([c])
 
         best_group: list[tuple[int, int, int, int]] = []
-        best_score = float("inf")
-        for combo in combinations(candidates, self.expected_led_count):
-            group = sorted(combo, key=lambda c: c[0])
-            ys = np.array([y + h / 2.0 for _, y, _, h in group], dtype=np.float32)
-            if float(ys.max() - ys.min()) > max_y_dev:
+        best_score = -1.0
+        best_spacing: float | None = None
+        best_center_y: float | None = None
+        for group in groups:
+            if len(group) < min_candidates:
                 continue
+            group = sorted(group, key=lambda c: c[0] + c[2] / 2.0)
             xs = np.array([x + w / 2.0 for x, _, w, _ in group], dtype=np.float32)
+            ys = np.array([y + h / 2.0 for _, y, _, h in group], dtype=np.float32)
+            widths = np.array([w for _, _, w, _ in group], dtype=np.float32)
+            heights = np.array([h for _, _, _, h in group], dtype=np.float32)
+            if len(xs) < 2:
+                continue
             spacings = np.diff(xs)
-            if np.any(spacings <= 0):
+            positive_spacings = spacings[spacings > 1.0]
+            if positive_spacings.size == 0:
                 continue
-            mean_spacing = float(np.mean(spacings))
-            if mean_spacing <= 1.0:
+            spacing = float(np.median(positive_spacings))
+            spacing_residual = float(np.mean(np.abs(positive_spacings - spacing)) / max(spacing, 1.0))
+            if spacing_residual > max_spacing_dev_ratio:
                 continue
-            max_dev = float(np.max(np.abs(spacings - mean_spacing)) / mean_spacing)
-            if max_dev > max_spacing_dev_ratio:
+            y_span = float(ys.max() - ys.min())
+            if y_span > 2.0 * max_y_dev:
                 continue
-            score = self._score_group(group)
-            if score < best_score:
-                best_score = score
+            size_var = float(np.std(widths) / max(1.0, np.mean(widths)) + np.std(heights) / max(1.0, np.mean(heights)))
+            count_score = min(1.0, len(group) / float(self.expected_led_count))
+            spacing_score = max(0.0, 1.0 - min(1.0, spacing_residual / max_spacing_dev_ratio))
+            y_score = max(0.0, 1.0 - min(1.0, y_span / max(1.0, 2.0 * max_y_dev)))
+            size_score = max(0.0, 1.0 - min(1.0, size_var))
+            geometry_score = 2.5 * count_score + 1.8 * spacing_score + 1.2 * y_score + 0.8 * size_score
+            if geometry_score > best_score:
+                best_score = geometry_score
                 best_group = group
-        return best_group
+                best_spacing = spacing
+                best_center_y = float(np.median(ys))
+
+        if not best_group:
+            return [], candidates.copy(), None, None
+
+        rejected = []
+        for c in candidates:
+            cy = c[1] + c[3] / 2.0
+            if best_center_y is None or abs(cy - best_center_y) > max_y_dev:
+                rejected.append(c)
+        return best_group, rejected, best_score, best_spacing
 
     def locate(self, frame: np.ndarray) -> LocatorResult:
         try:
@@ -125,14 +156,11 @@ class SlotBasedLEDLocator(BaseLEDLocator):
         original_candidates = self._extract_candidates(
             frame, (x0, y0, x1, y1), dark_threshold, min_area, max_area, min_height, max_width, min_aspect_ratio
         )
-        selected = self._select_plausible_five(original_candidates)
+        selected, rejected_out_of_row, geometry_score, best_row_spacing = self._select_best_row_group(original_candidates)
 
         recovered_candidates: list[tuple[int, int, int, int]] = []
         reconstructed_candidates: list[tuple[int, int, int, int]] = []
         estimated_spacing: float | None = None
-
-        if not selected:
-            selected = original_candidates.copy()
 
         selected = sorted(selected, key=lambda c: c[0] + c[2] / 2.0)
 
@@ -146,6 +174,8 @@ class SlotBasedLEDLocator(BaseLEDLocator):
             heights = np.array([h for _, _, _, h in selected], dtype=np.float32)
             if centers.size >= 2:
                 estimated_spacing = float(np.median(np.diff(centers)))
+            elif best_row_spacing is not None:
+                estimated_spacing = best_row_spacing
             if estimated_spacing is not None and estimated_spacing > 2.0:
                 anchor = centers[0]
                 start = anchor
@@ -201,6 +231,8 @@ class SlotBasedLEDLocator(BaseLEDLocator):
             heights = np.array([h for _, _, _, h in selected], dtype=np.float32)
             if centers.size >= 2:
                 estimated_spacing = float(np.median(np.diff(centers)))
+            elif best_row_spacing is not None:
+                estimated_spacing = best_row_spacing
             if estimated_spacing is not None and estimated_spacing > 2.0:
                 start = float(np.min(centers))
                 expected_xs = [start + i * estimated_spacing for i in range(self.expected_led_count)]
@@ -230,7 +262,7 @@ class SlotBasedLEDLocator(BaseLEDLocator):
         status = "ok" if len(selected) == self.expected_led_count else "failed"
         confidence = 0.0
         if len(selected) == self.expected_led_count:
-            if recovered_count == 0 and reconstructed_count == 0 and len(self._select_plausible_five(original_candidates)) == self.expected_led_count:
+            if recovered_count == 0 and reconstructed_count == 0 and len(selected) == self.expected_led_count and len(rejected_out_of_row) == 0:
                 confidence = 1.0
             elif reconstructed_count == 0:
                 confidence = 0.9 if recovered_count == 1 else 0.8
@@ -285,17 +317,21 @@ class SlotBasedLEDLocator(BaseLEDLocator):
             "recovered_candidates": [{"x": x, "y": y, "width": ww, "height": hh} for x, y, ww, hh in recovered_candidates],
             "reconstructed_candidates": [{"x": x, "y": y, "width": ww, "height": hh} for x, y, ww, hh in reconstructed_candidates],
             "selected_candidates": [{"x": x, "y": y, "width": ww, "height": hh} for x, y, ww, hh in selected],
+            "rejected_out_of_row_candidates": [{"x": x, "y": y, "width": ww, "height": hh} for x, y, ww, hh in rejected_out_of_row],
             "candidate_count": original_count,
             "selected_count": len(selected),
+            "rejected_out_of_row_count": len(rejected_out_of_row),
             "recovered_count": recovered_count,
             "reconstructed_count": reconstructed_count,
             "estimated_spacing": estimated_spacing,
+            "row_center_y": None if not selected else float(np.median([y + hh / 2.0 for _, y, _, hh in selected])),
+            "max_y_deviation_px": float(self.geometry.get("max_y_deviation_px", 25)),
             "median_marker_width": median_marker_width,
             "median_marker_height": median_marker_height,
             "dynamic_roi_width": dynamic_roi_width,
             "dynamic_roi_height": dynamic_roi_height,
             "dynamic_offset_y": dynamic_offset_y,
-            "geometry_score": None,
+            "geometry_score": geometry_score,
             "locator_status": status,
             "locator_confidence": confidence,
             "dark_threshold": dark_threshold,

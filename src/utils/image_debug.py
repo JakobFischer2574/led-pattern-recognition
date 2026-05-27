@@ -95,6 +95,9 @@ def draw_detection_debug_image(
     for c in locator_data.get("selected_candidates", []):
         cv2.rectangle(base, (int(c["x"]), int(c["y"])), (int(c["x"] + c["width"]), int(c["y"] + c["height"])), (255, 0, 0), 2)
 
+    for c in locator_data.get("rejected_out_of_row_candidates", []):
+        cv2.rectangle(base, (int(c["x"]), int(c["y"])), (int(c["x"] + c["width"]), int(c["y"] + c["height"])), (0, 128, 255), 2)
+
     for px in locator_data.get("projection_peaks", []):
         cv2.line(base, (int(px), 0), (int(px), h - 1), (0, 255, 255), 1)
 
@@ -145,8 +148,11 @@ def draw_detection_debug_image(
     draw_text(f"locator_conf: {locator_confidence:.3f}", y0); y0 += line_h
     draw_text(f"candidates: {locator_data.get('candidate_count', 0)}", y0); y0 += line_h
     draw_text(f"selected: {locator_data.get('selected_count', 0)}", y0); y0 += line_h
+    draw_text(f"rejected_out_of_row: {locator_data.get('rejected_out_of_row_count', 0)}", y0); y0 += line_h
     draw_text(f"recovered_count: {locator_data.get('recovered_count', 0)}", y0); y0 += line_h
     draw_text(f"reconstructed_count: {locator_data.get('reconstructed_count', 0)}", y0); y0 += line_h
+    draw_text(f"row_center_y: {_format_value(locator_data.get('row_center_y'))}", y0); y0 += line_h
+    draw_text(f"max_y_deviation_px: {_format_value(locator_data.get('max_y_deviation_px'))}", y0); y0 += line_h
     draw_text(f"estimated_spacing: {_format_value(locator_data.get('estimated_spacing'))}", y0); y0 += line_h
     draw_text(f"median_marker_width: {_format_value(locator_data.get('median_marker_width'))}", y0); y0 += line_h
     draw_text(f"median_marker_height: {_format_value(locator_data.get('median_marker_height'))}", y0); y0 += line_h
