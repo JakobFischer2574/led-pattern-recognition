@@ -89,6 +89,12 @@ def draw_detection_debug_image(
         rw, rh = int(search_region["width"]), int(search_region["height"])
         cv2.rectangle(base, (x, y), (x + rw, y + rh), (255, 255, 0), 2)
 
+    slot_band = locator_data.get("slot_band")
+    if slot_band:
+        x, y = int(slot_band["x"]), int(slot_band["y"])
+        rw, rh = int(slot_band["width"]), int(slot_band["height"])
+        cv2.rectangle(base, (x, y), (x + rw, y + rh), (255, 0, 255), 2)
+
     for c in locator_data.get("all_candidates", []):
         cv2.rectangle(base, (int(c["x"]), int(c["y"])), (int(c["x"] + c["width"]), int(c["y"] + c["height"])), (0, 255, 255), 1)
 
@@ -147,6 +153,8 @@ def draw_detection_debug_image(
     draw_text(f"reconstructed_count: {locator_data.get('reconstructed_count', 0)}", y0); y0 += line_h
     if "fallback_counter" in locator_data:
         draw_text(f"fallback_counter: {locator_data['fallback_counter']}", y0); y0 += line_h
+    if slot_band:
+        draw_text(f"slot_band=({slot_band['x']},{slot_band['y']},{slot_band['width']},{slot_band['height']})", y0, (180, 180, 180), 0.40); y0 += line_h
     draw_text(f"dark_threshold: {locator_data.get('dark_threshold', 'n/a')}", y0); y0 += line_h
     draw_text(f"min_peak_distance_px: {locator_data.get('min_peak_distance_px', 'n/a')}", y0); y0 += line_h
     draw_text(f"smoothing_window_px: {locator_data.get('smoothing_window_px', 'n/a')}", y0); y0 += line_h
