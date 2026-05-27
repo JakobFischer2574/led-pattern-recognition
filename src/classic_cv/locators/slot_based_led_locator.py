@@ -14,6 +14,7 @@ class SlotBasedLEDLocator(BaseLEDLocator):
         self.config = config
         self.search_region = config.get("search_region", {})
         self.slot_detection = config.get("slot_detection", {})
+        self.slot_band = config.get("slot_band", {})
         self.projection_detection = config.get("projection_detection", {})
         self.geometry = config.get("geometry", {})
         self.roi_cfg = config.get("roi", {})
@@ -32,6 +33,20 @@ class SlotBasedLEDLocator(BaseLEDLocator):
         if x1 <= x0 or y1 <= y0:
             raise ValueError("Ungültige locator.search_region Konfiguration.")
         return x0, y0, x1, y1
+
+    def _relative_bounds(self, bounds: tuple[int, int, int, int], ratios: dict[str, Any]) -> tuple[int, int, int, int]:
+        x0, y0, x1, y1 = bounds
+        bw = x1 - x0
+        bh = y1 - y0
+        rx0 = x0 + int(bw * float(ratios.get("x_min_ratio", 0.0)))
+        rx1 = x0 + int(bw * float(ratios.get("x_max_ratio", 1.0)))
+        ry0 = y0 + int(bh * float(ratios.get("y_min_ratio", 0.0)))
+        ry1 = y0 + int(bh * float(ratios.get("y_max_ratio", 1.0)))
+        rx0, rx1 = max(x0, rx0), min(x1, rx1)
+        ry0, ry1 = max(y0, ry0), min(y1, ry1)
+        if rx1 <= rx0 or ry1 <= ry0:
+            return x0, y0, x1, y1
+        return rx0, ry0, rx1, ry1
 
     def _find_projection_peaks(self, column_score: np.ndarray, min_distance: int, min_prominence: float) -> list[int]:
         if column_score.size < 3:
@@ -143,8 +158,11 @@ class SlotBasedLEDLocator(BaseLEDLocator):
             return LocatorResult(regions=[], status="failed", confidence=0.0, debug_info={"error": str(exc), "locator_type": "slot_based"})
 
         search = frame[y0:y1, x0:x1]
-        sx0, sy0, sx1, sy1 = x0, y0, x1, y1
-        slot_img = search
+        slot_bounds = (x0, y0, x1, y1)
+        if bool(self.slot_band.get("enabled", True)):
+            slot_bounds = self._relative_bounds((x0, y0, x1, y1), self.slot_band)
+        sx0, sy0, sx1, sy1 = slot_bounds
+        slot_img = frame[sy0:sy1, sx0:sx1]
 
         projection_enabled = bool(self.projection_detection.get("enabled", True))
         selected_centers: list[int] = []
@@ -225,6 +243,7 @@ class SlotBasedLEDLocator(BaseLEDLocator):
         debug = {
             "locator_type": "slot_based",
             "search_region": {"x": x0, "y": y0, "width": x1 - x0, "height": y1 - y0},
+            "slot_band": {"x": sx0, "y": sy0, "width": sx1 - sx0, "height": sy1 - sy0},
             "all_candidates": [{"x": x, "y": y, "width": w, "height": h} for x, y, w, h in candidates],
             "selected_candidates": [{"x": x, "y": y, "width": w, "height": h} for x, y, w, h in selected],
             "candidate_count": len(candidates),
