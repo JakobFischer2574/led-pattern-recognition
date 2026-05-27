@@ -9,12 +9,6 @@ locator:
     x_max_ratio: 0.95
     y_min_ratio: 0.35
     y_max_ratio: 0.90
-  slot_band:
-    enabled: true
-    y_min_ratio: 0.45
-    y_max_ratio: 0.85
-    x_min_ratio: 0.00
-    x_max_ratio: 1.00
   projection_detection:
     enabled: true
     dark_threshold: 90
@@ -79,4 +73,3 @@ classification:
 
 debug:
   save_debug_images: true
-
