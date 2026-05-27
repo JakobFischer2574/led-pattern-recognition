@@ -9,6 +9,21 @@ locator:
     x_max_ratio: 0.95
     y_min_ratio: 0.35
     y_max_ratio: 0.90
+  slot_band:
+    enabled: true
+    y_min_ratio: 0.45
+    y_max_ratio: 0.85
+    x_min_ratio: 0.00
+    x_max_ratio: 1.00
+  projection_detection:
+    enabled: true
+    dark_threshold: 90
+    vertical_close_kernel_width: 3
+    vertical_close_kernel_height: 11
+    opening_kernel_size: 3
+    min_peak_distance_px: 25
+    min_peak_prominence: 5
+    smoothing_window_px: 7
   slot_detection:
     dark_threshold: 90
     min_area: 40
