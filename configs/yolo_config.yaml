@@ -1,3 +1,8 @@
-model_path: "models/yolo11n_1/best.pt"
+model_path: "models/yolo/best.pt"
 confidence_threshold: 0.25
 device: cpu
+expected_led_count: 5
+
+class_mapping:
+  0: led_on
+  1: led_off
