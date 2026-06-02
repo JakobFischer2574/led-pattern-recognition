@@ -1,5 +1,12 @@
-frame_name,mean_latency_ms,led_1,led_2,led_3,led_4,led_5
-video_001_frame_000000.jpg,28.797,1,1,1,0,0
-video_001_frame_000030.jpg,7.354,1,1,1,1,0
-video_001_frame_000060.jpg,9.137,1,1,1,1,0
-video_001_frame_000090.jpg,9.168,1,1,1,1,0
+frame_name,mean_latency_ms,locator_status,locator_confidence,led_1,led_2,led_3,led_4,led_5
+video_001_frame_000000.jpg,22.904,ok,1.0,0,0,1,0,1
+video_001_frame_000010.jpg,19.118,ok,1.0,0,0,0,0,1
+video_001_frame_000020.jpg,19.077,ok,1.0,0,0,0,0,1
+video_001_frame_000030.jpg,18.66,ok,1.0,0,0,1,0,1
+video_001_frame_000040.jpg,17.145,ok,0.8,0,0,1,0,1
+video_001_frame_000050.jpg,17.297,ok,0.8,0,0,0,0,1
+video_001_frame_000060.jpg,18.816,ok,1.0,0,0,0,0,1
+video_001_frame_000070.jpg,18.014,ok,0.8,0,0,1,0,1
+video_001_frame_000080.jpg,17.134,ok,1.0,0,0,1,0,1
+video_001_frame_000090.jpg,19.424,ok,1.0,0,0,0,0,1
+video_001_frame_000100.jpg,18.319,ok,1.0,0,0,1,0,1

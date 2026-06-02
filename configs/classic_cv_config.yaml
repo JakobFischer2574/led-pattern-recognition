@@ -9,13 +9,13 @@ locator:
     y_min_ratio: 0.34
     y_max_ratio: 0.92
   slot_band:
-    enabled: true
+    enabled: false
     y_min_ratio: 0.45
     y_max_ratio: 0.85
     x_min_ratio: 0.0
     x_max_ratio: 1.0
   projection_detection:
-    enabled: true
+    enabled: false
     dark_threshold: 90
     vertical_close_kernel_width: 3
     vertical_close_kernel_height: 11
@@ -24,12 +24,12 @@ locator:
     min_peak_prominence: 5
     smoothing_window_px: 7
   slot_detection:
+    max_area: 6500
+    max_width: 110
+    min_aspect_ratio: 1.15
     dark_threshold: 60
     min_area: 80
-    max_area: 1600
     min_height: 10
-    max_width: 55
-    min_aspect_ratio: 1.5
     morphology_kernel_size: 3
   geometry:
     expected_led_count: 5
